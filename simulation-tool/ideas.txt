@@ -1,0 +1,7 @@
+TO SIMULATE
+- Given X% emissions reduction target globally, how much would Y mitigant have to be applied in each country?
+	o Assuming equal mitigant applications in all countries
+	o Assuming equal emission sources for all countries
+
+FUTURE WORK
+- Compare cost-efficacy of different mitigants for same X% emission reduction

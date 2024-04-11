@@ -143,3 +143,4 @@ reduce_meat_consumption <- function(meat, region, percent_reduction){
 ### TODO: Add fish consumption data
 ### TODO: Impute missing values for countries based on regional per capita averages
 ### TODO: Add economy of scale adjustment for per capita meat emissions
+### TODO: Do replacements instead of removals
