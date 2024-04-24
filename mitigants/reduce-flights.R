@@ -9,7 +9,6 @@ source("data/utils/geography.R")
 # Load libraries
 library(dplyr)
 
-
 #### LOAD AND CLEAN DATA ####
 
 # Load global CO2 equivalent emissions data
@@ -124,11 +123,9 @@ reduce_flights <- function(flight, country, percent_reduction){
   # Apply reduction to total flight emission data
   old_emissions <- total_flight_emissions[
     total_flight_emissions$Code %in% country, paste0('total_', flight, '_co2eq')]
-  new_emissions <- total_flight_emissions[
-    total_flight_emissions$Code %in% country, paste0('total_', flight, '_co2eq')] *
-    (100 - percent_reduction) / 100
+  new_emissions <- old_emissions * (100 - percent_reduction) / 100
   impact <- old_emissions - new_emissions
-  impact_million_tonnes <- impact / 100000000
+  impact_million_tonnes <- impact / 1000 / 1000000
   # Compare to current emissions
   country_emissions <- ghg_df[ghg_df$Code %in% country, 'co2eq']
   global_emissions <- ghg_df[ghg_df$Code == 'OWID_WRL', 'co2eq']

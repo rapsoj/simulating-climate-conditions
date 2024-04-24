@@ -108,11 +108,9 @@ reduce_deforest <- function(country, percent_reduction){
   # Apply reduction to total deforestation emission data
   old_emissions <- total_deforest_emissions[
     total_deforest_emissions$Code %in% country, paste0('total_', 'co2')]
-  new_emissions <- total_deforest_emissions[
-    total_deforest_emissions$Code %in% country, paste0('total_', 'co2')] *
-    (100 - percent_reduction) / 100
+  new_emissions <- old_emissions * (100 - percent_reduction) / 100
   impact <- old_emissions - new_emissions
-  impact_million_tonnes <- impact / 100000000
+  impact_million_tonnes <- impact / 1000 / 1000000
   # Compare to current emissions
   country_emissions <- ghg_df[ghg_df$Code %in% country, 'co2eq']
   global_emissions <- ghg_df[ghg_df$Code == 'OWID_WRL', 'co2eq']

@@ -25,7 +25,11 @@ ghg_df <- read.csv('data/total-ghg-emissions.csv') %>%
   # Link regions
   merge(stack(regions), by.x = "Code", by.y = "values", all.x = T) %>%
   # Rename columns
-  dplyr::rename('region' = ind)
+  dplyr::rename('region' = ind) %>%
+  # Link continents
+  merge(stack(continents), by.x = "region", by.y = "values", all.x = T) %>%
+  # Rename columns
+  dplyr::rename('continent' = ind)
 
 # Load population data
 pop_df <- read.csv('data/population.csv') %>%
@@ -40,7 +44,11 @@ pop_df <- read.csv('data/population.csv') %>%
   # Link regions
   merge(stack(regions), by.x = "Code", by.y = "values", all.x = T) %>%
   # Rename columns
-  dplyr::rename('region' = ind)
+  dplyr::rename('region' = ind) %>%
+  # Link continents
+  merge(stack(continents), by.x = "region", by.y = "values", all.x = T) %>%
+  # Rename columns
+  dplyr::rename('continent' = ind)
 
 # Load data on annual per capita meat consumption
 meat_consumption_df <- read.csv(
@@ -105,6 +113,58 @@ total_meat_emissions <- merge(
     'Code', 'per_cap_beef_co2eq', 'per_cap_pork_co2eq',
     'per_cap_sheep_goat_co2eq', 'per_cap_poultry_co2eq')],
   by='Code', all.x=T) %>%
+  # Group by region
+  group_by(region) %>%
+  # Impute missing per capita values using regional averages
+  mutate(
+    # Add imputation flags
+    impute_flag_beef = ifelse(is.na(per_cap_beef_co2eq), "*", ""),
+    impute_flag_pork = ifelse(is.na(per_cap_pork_co2eq), "*", ""),
+    impute_flag_sheep_goat = ifelse(is.na(per_cap_sheep_goat_co2eq), "*", ""),
+    impute_flag_poultry = ifelse(is.na(per_cap_poultry_co2eq), "*", ""),
+    # Impute per capita values using regional averages
+    per_cap_beef_co2eq = if_else(
+      impute_flag_beef == "*",
+      median(per_cap_beef_co2eq, na.rm = T), per_cap_beef_co2eq),
+    per_cap_pork_co2eq = if_else(
+      impute_flag_pork == "*",
+      median(per_cap_pork_co2eq, na.rm = T), per_cap_pork_co2eq),
+    per_cap_sheep_goat_co2eq = if_else(
+      impute_flag_sheep_goat == "*",
+      median(per_cap_sheep_goat_co2eq, na.rm = T), per_cap_sheep_goat_co2eq),
+    per_cap_poultry_co2eq = if_else(
+      impute_flag_poultry == "*",
+      median(per_cap_poultry_co2eq, na.rm = T), per_cap_poultry_co2eq)
+  ) %>%
+  # Ungroup data
+  ungroup() %>%
+  # Group by continent
+  group_by(continent) %>%
+  # Impute remaining missing per capita values using continent averages
+  mutate(
+    # Add imputation flags
+    impute_flag_beef = ifelse(
+      is.na(per_cap_beef_co2eq),"**", impute_flag_beef),
+    impute_flag_pork = ifelse(
+      is.na(per_cap_pork_co2eq), "**", impute_flag_pork),
+    impute_flag_sheep_goat = ifelse(
+      is.na(per_cap_sheep_goat_co2eq), "**", impute_flag_sheep_goat),
+    impute_flag_poultry = ifelse(
+      is.na(per_cap_poultry_co2eq), "**", impute_flag_poultry),
+    # Impute per capita values using regional averages
+    per_cap_beef_co2eq = if_else(
+      impute_flag_beef == "**",
+      median(per_cap_beef_co2eq, na.rm = T), per_cap_beef_co2eq),
+    per_cap_pork_co2eq = if_else(
+      impute_flag_pork == "**",
+      median(per_cap_pork_co2eq, na.rm = T), per_cap_pork_co2eq),
+    per_cap_sheep_goat_co2eq = if_else(
+      impute_flag_sheep_goat == "**",
+      median(per_cap_sheep_goat_co2eq, na.rm = T), per_cap_sheep_goat_co2eq),
+    per_cap_poultry_co2eq = if_else(
+      impute_flag_poultry == "**",
+      median(per_cap_poultry_co2eq, na.rm = T), per_cap_poultry_co2eq)
+  ) %>%
   # Add columns with total meat emissions
   mutate(
     # Calculate total beef emissions
@@ -122,11 +182,9 @@ reduce_meat_consumption <- function(meat, country, percent_reduction){
   # Apply reduction to total meat emission data
   old_emissions <- total_meat_emissions[
     total_meat_emissions$Code %in% country, paste0('total_', meat, '_co2eq')]
-  new_emissions <- total_meat_emissions[
-    total_meat_emissions$Code %in% country, paste0('total_', meat, '_co2eq')] *
-    (100 - percent_reduction) / 100
+  new_emissions <- old_emissions * (100 - percent_reduction) / 100
   impact <- old_emissions - new_emissions
-  impact_million_tonnes <- impact / 100000000
+  impact_million_tonnes <- impact / 1000 / 1000000
   # Compare to current emissions
   country_emissions <- ghg_df[ghg_df$Code %in% country, 'co2eq']
   global_emissions <- ghg_df[ghg_df$Code == 'OWID_WRL', 'co2eq']
