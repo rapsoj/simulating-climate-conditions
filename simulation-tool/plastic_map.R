@@ -139,8 +139,10 @@ server <- function(input, output) {
     # Create an interactive map
     plot_ly(type = 'choropleth',
             locations = total_plastic_waste$Code,
-            z = reduction_df$impact_million_tonnes,
-            text = ~paste(total_plastic_waste$Entity, "<br>", "Impact (million tonnes CO2eq):", reduction_df$impact_million_tonnes),
+            z = round(reduction_df$impact_million_tonnes,2),
+            text = ~paste(total_plastic_waste$Entity, "<br>", 
+                          "Impact (million tonnes CO2eq):", 
+                          round(reduction_df$impact_million_tonnes,2)),
             colorscale = "Viridis",
             marker = list(line = list(width = 0.5)),
             colorbar = list(title = "Impact (million tonnes CO2eq)")) %>%
