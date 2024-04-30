@@ -1,7 +1,7 @@
 #### PREPARE WORKSPACE ####
 
 # Move working directory to main folder
-setwd("C:/Users/fakuz/OneDrive/Dokumente/GitHub/simulating-climate-conditions")
+setwd("../")
 
 # Import utils
 source("data/utils/geography.R")
@@ -51,16 +51,20 @@ pop_df <- read.csv('data/population.csv') %>%
   dplyr::rename('continent' = ind)
 
 # Load data on vehicle emissions
-vehicle_emissions_df <- read.csv('data/per-capita-co2-transport.csv')
-vehicle_emissions_df <- vehicle_emissions_df %>%
-  dplyr::rename(per_capita_emissions = `Per.capita.CO2.emissions`)
+vehicle_emissions_df <- read.csv('data/per-capita-co2-transport.csv') %>%
+  dplyr::rename(per_capita_emissions = `Per.capita.CO2.emissions`) %>%
+  # Group by country
+  group_by(Entity) %>%
+  # Select the most recent year for which data is available
+  slice_max(order_by = Year) %>%
+  # Ungroup data
+  ungroup()
 
 # Load data on registered vehicles per 1000 people
 vehicles_per_1000_df <- read.csv('data/registered-vehicles-per-1000-people.csv', 
                                  fileEncoding = "UTF-8-BOM", 
                                  check.names = FALSE, 
-                                 stringsAsFactors = FALSE)
-vehicles_per_1000_df <- vehicles_per_1000_df %>%
+                                 stringsAsFactors = FALSE) %>%
   dplyr::rename(vehicles_per_1000 = `Registered.vehicles.per.1000.people`)
 
 
@@ -73,42 +77,25 @@ percent_reduction_vars <- c(0:100)
 # Write printable versions of variable names
 country_print <- setNames(as.list(ghg_df$Entity), ghg_df$Code)
 
-# Calculate total vehicles with population data
-total_vehicles_df <- merge(vehicles_per_1000_df, pop_df, by = "Code") %>%
-  mutate(total_vehicles = (vehicles_per_1000 / 1000) * pop)
-
 # Calculate total emissions from vehicles
-total_vehicle_emissions <- merge(
-  total_vehicles_df,
-  vehicle_emissions_df,
-  by = "Code",
-  all.x = TRUE
-) %>%
-  mutate(
-    total_vehicle_emissions = total_vehicles * per_capita_emissions
-  )
+total_vehicles_emissions_df <- pop_df %>% select(-c(Year, Entity)) %>%
+  merge(vehicles_per_1000_df, by = "Code", all.x=T) %>%
+  # Calculate per capita vehicle emissions
+  mutate(total_vehicles = (vehicles_per_1000 / 1000) * pop) %>%
+  # Merge with vehicle emissions data
+  merge(vehicle_emissions_df %>% select(!Entity), by = "Code", all.x = TRUE) %>%
+  # Calculate total emissions from vehicles
+  mutate(total_vehicle_emissions = total_vehicles * per_capita_emissions)
 
-# Merge vehicle emissions data with population data
-total_vehicle_emissions <- merge(
-  pop_df,
-  vehicle_emissions_df,
-  by = "Code",
-  all.x = TRUE
-) %>%
-  mutate(
-    total_vehicle_emissions = pop * per_capita_emissions
-  )
-    
- 
 # Write function to calculate impact of vehicle reduction
 reduce_vehicles <- function(country, percent_reduction){
-  filtered_data <- total_vehicle_emissions[total_vehicle_emissions$Code %in% country,]
   
   # Apply reduction to total vehicle emission data
-  old_emissions <- sum(filtered_data$total_vehicle_emissions)
+  old_emissions <- total_vehicles_emissions_df[
+    total_vehicles_emissions_df$Code %in% country, 'total_vehicle_emissions']
   new_emissions <- old_emissions * (100 - percent_reduction) / 100
   impact <- old_emissions - new_emissions
-  impact_million_tonnes <- impact / 100000000
+  impact_million_tonnes <- impact / 1000 / 1000000
   
   # Compare to current emissions
   country_emissions <- sum(ghg_df[ghg_df$Code %in% country, 'co2eq'])

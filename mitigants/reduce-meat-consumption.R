@@ -1,8 +1,5 @@
 #### PREPARE WORKSPACE ####
 
-# Move working directory to main folder
-setwd("../")
-
 # Import utils
 source("data/utils/geography.R")
 
@@ -191,15 +188,16 @@ reduce_meat_consumption <- function(meat, country, percent_reduction){
   percent_impact_country <- impact / country_emissions * 100
   percent_impact_global <- impact / global_emissions * 100
   # Print result
-  print(paste0(
+  result <- c(
+    paste0(
     'The impact of reducing ', country_print[country], ' ', meat_print[meat],
     ' consumption by ', percent_reduction, '% is a reduction of ',
     round(impact_million_tonnes, 2), ' million tonnes CO2 equivalent or ',
     round(percent_impact_country, 2), '% of total ', country_print[country], 
-    ' emissions.'))
-  print(paste0(
-    'This is ', round(percent_impact_global, 2), '% of global emissions.'))
-}
+    ' emissions.'),
+  paste0(
+    'This is ', round(percent_impact_global, 2), '% of global emissions.')
+  )}
 
 
 #### SOURCES ####
@@ -210,6 +208,5 @@ reduce_meat_consumption <- function(meat, country, percent_reduction){
 # ghg-per-kg-poore.csv: Our World in Data. (2018). "Greenhouse gas emissions per kilogram of food product". Retrieved from https://ourworldindata.org/environmental-impacts-of-food.
 
 ### TODO: Add fish consumption data
-### TODO: Impute missing values for countries based on regional per capita averages
 ### TODO: Add economy of scale adjustment for per capita meat emissions
 ### TODO: Do replacements instead of removals
