@@ -5,7 +5,7 @@ library(dplyr)
 #### LOAD AND CLEAN DATA ####
 
 # Load global CO2 equivalent emissions data
-ghg_df <- read.csv('total-ghg-emissions.csv') %>%
+ghg_df <- read.csv('data/total-ghg-emissions.csv') %>%
   # Rename columns
   rename('co2eq' = Annual.greenhouse.gas.emissions.in.CO..equivalents) %>%
   # Convert from tonnes to kilograms
@@ -17,7 +17,7 @@ ghg_df <- read.csv('total-ghg-emissions.csv') %>%
 
 # Load and clean municipal water withdrawal data
 # (make simplifying assumption that all water withdrawn is used)
-water_use <- read.csv("municipal-water-withdrawal.csv") %>%
+water_use <- read.csv("data/municipal-water-withdrawal.csv") %>%
   # rename columns 
   rename('water_use' = Municipal.water.withdrawal) %>%
   # filter to country level
@@ -47,16 +47,28 @@ region_print <- setNames(as.list(ghg_df$Entity), ghg_df$Code)
 # Add emissions data to water_use dataframe
 water_use <- data.frame(water_use) %>%
   # add co2eq column
-  mutate(co2eq = water_use * kg_co2eq_per_m3)
+  mutate(water_co2eq = water_use * kg_co2eq_per_m3)
+
+
+
+# Filter dataframe to just Entity, Code, and emissions
+water_use <- subset(water_use,
+                         select = c("Entity", "Code", "water_co2eq"))
+# Add in missing countries to match the ghg_df 
+water_use <- subset(merge(ghg_df, water_use, by = c("Entity", "Code"), all.x = TRUE),
+                         select = c("Entity", "Code", "water_co2eq"))
+
+
+
 
 # Write function to calculate impact of mitigant
 # Write function to calculate impact of mitigant
 reduce_domestic_water_use <- function(region, percent_reduction){
   # Apply reduction to cement production emission data
   old_emissions <- water_use[
-    water_use$Code %in% region, "co2eq"]
+    water_use$Code %in% region, "water_co2eq"]
   new_emissions <- water_use[
-    water_use$Code %in% region, "co2eq"] *
+    water_use$Code %in% region, "water_co2eq"] *
     (100 - percent_reduction) / 100
   impact <- old_emissions - new_emissions
   impact_million_tonnes <- impact / 1000000000
@@ -65,15 +77,16 @@ reduce_domestic_water_use <- function(region, percent_reduction){
   global_emissions <- ghg_df[ghg_df$Code == 'OWID_WRL', 'co2eq']
   percent_impact_country <- impact / country_emissions * 100
   percent_impact_global <- impact / global_emissions * 100
-  # Print result
-  print(paste0(
-    'The impact of reducing ', region_print[region], ' domestic water use by ', 
-    percent_reduction, '% is a reduction of ',
-    round(impact_million_tonnes, 2), ' million tonnes CO2 equivalent or ',
-    round(percent_impact_country, 2), '% of total ', region_print[region], 
-    ' emissions.'))
-  print(paste0(
-    'This is ', round(percent_impact_global, 2), '% of global emissions.'))
+  # Organise outputs
+  output_df <- data.frame("Code" = region,
+                          "Entity" = ghg_df[
+                            ghg_df$Code %in% region,
+                          ]$Entity,
+                          "old_emissions" = old_emissions,
+                          "new_emissions" = new_emissions,
+                          "impact" = impact,
+                          "impact_million_tonnes" = impact_million_tonnes)
+  return(output_df)
 }  
 
 

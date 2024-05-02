@@ -5,7 +5,7 @@ library(dplyr)
 #### LOAD AND CLEAN DATA ####
 
 # Load global CO2 equivalent emissions data
-ghg_df <- read.csv('total-ghg-emissions.csv') %>%
+ghg_df <- read.csv('data/total-ghg-emissions.csv') %>%
   # Rename columns
   rename('co2eq' = Annual.greenhouse.gas.emissions.in.CO..equivalents) %>%
   # Convert from tonnes to kilograms
@@ -16,7 +16,7 @@ ghg_df <- read.csv('total-ghg-emissions.csv') %>%
   filter(Code != '')
 
 # Load population data
-pop_df <- read.csv('population.csv') %>%
+pop_df <- read.csv('data/population.csv') %>%
   # Rename columns
   rename('pop' = Population..historical.estimates.) %>%
   # Filter to most recent year
@@ -26,7 +26,7 @@ pop_df <- read.csv('population.csv') %>%
 
 # These are data taken from the Global Waste Index 2022, all figures are in 
 # kg per capita
-landfill_per_cap <- subset(read.csv("global_waste_index_2022.csv"),
+landfill_per_cap <- subset(read.csv("data/global_waste_index_2022.csv"),
                              select = c("Country", "Landfill"))
 landfill_per_cap <- landfill_per_cap %>% 
   rename('Entity' = Country)
@@ -36,6 +36,19 @@ landfill_per_cap$Landfill <- gsub(" kg", "", landfill_per_cap$Landfill)
 landfill_per_cap$Landfill <- as.numeric(landfill_per_cap$Landfill)
 landfill_per_cap <- landfill_per_cap %>%
   rename('landfill_kg_per_cap' = Landfill)
+
+# Rename the countries that contradict names in ghg_df
+# USA = United States
+# Slovak Republic = Slovakia
+# Czech Republic = Czechia
+landfill_per_cap <- landfill_per_cap %>%
+  mutate(Entity = case_when(
+    Entity == "USA" ~ "United States",
+    Entity == "Slovak Republic" ~ "Slovakia",
+    Entity == "Czech Republic" ~ "Czechia",
+    TRUE ~ Entity
+  ))
+
 
 # GOV UK experimental statistics:
 # Residual waste emissions from landfill have decreased from 1.8 million tonnes
@@ -59,7 +72,6 @@ percent_reduction_vars <- c(0:100)
 # Write printable versions of variable names
 region_print <- setNames(as.list(ghg_df$Entity), ghg_df$Code)
 
-
 # Merge landfill and population dataframes
 total_landfill <- merge(
   pop_df, landfill_per_cap, 
@@ -69,33 +81,41 @@ total_landfill = total_landfill[!is.na(total_landfill$landfill_kg_per_cap), ] %>
   # append column with total landfill waste
   mutate(total_landfill_waste = pop * landfill_kg_per_cap) %>%
   # append column with total landfill emissions
-  mutate(total_co2eq = total_landfill_waste * co2eq_per_kg)
+  mutate(landfill_co2eq = total_landfill_waste * co2eq_per_kg)
+
+# Filter dataframe to just Entity, Code, and emissions
+total_landfill <- subset(total_landfill,
+                    select = c("Entity", "Code", "landfill_co2eq"))
+# Add in missing countries to match the ghg_df 
+total_landfill <- subset(merge(ghg_df, total_landfill, by = c("Entity", "Code"), all.x = TRUE),
+                    select = c("Entity", "Code", "landfill_co2eq"))
 
 
 # Write function to calculate impact of mitigant
 reduce_landfill_waste <- function(region, percent_reduction){
   # Apply reduction to total plastic waste emission data
   old_emissions <- total_landfill[
-    total_landfill$Code %in% region, "total_co2eq"]
+    total_landfill$Code %in% region, "landfill_co2eq"]
   new_emissions <- total_landfill[
-    total_landfill$Code %in% region, "total_co2eq"] *
+    total_landfill$Code %in% region, "landfill_co2eq"] *
     (100 - percent_reduction) / 100
   impact <- old_emissions - new_emissions
-  impact_million_tonnes <- impact / 100000000
+  impact_million_tonnes <- impact / 1000000000
   # Compare to current emissions
   country_emissions <- ghg_df[ghg_df$Code %in% region, 'co2eq']
   global_emissions <- ghg_df[ghg_df$Code == 'OWID_WRL', 'co2eq']
   percent_impact_country <- impact / country_emissions * 100
   percent_impact_global <- impact / global_emissions * 100
-  # Print result
-  print(paste0(
-    'The impact of reducing ', region_print[region], 'landfill waste by ', 
-    percent_reduction, '% is a reduction of ',
-    round(impact_million_tonnes, 2), ' million tonnes CO2 equivalent or ',
-    round(percent_impact_country, 2), '% of total ', region_print[region], 
-    ' emissions.'))
-  print(paste0(
-    'This is ', round(percent_impact_global, 2), '% of global emissions.'))
+  # Organise outputs
+  output_df <- data.frame("Code" = region,
+                          "Entity" = ghg_df[
+                            ghg_df$Code %in% region,
+                          ]$Entity,
+                          "old_emissions" = old_emissions,
+                          "new_emissions" = new_emissions,
+                          "impact" = impact,
+                          "impact_million_tonnes" = impact_million_tonnes)
+  return(output_df)
 }   
 
 

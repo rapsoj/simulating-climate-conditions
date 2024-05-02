@@ -27,12 +27,13 @@ cement_production <- subset(read.csv("data/cement-production-by-country-2024.csv
   # convert KMT to tonnes
   mutate(cement_tonnes = cement_tonnes * 1000) %>%
   # add co2 column
-  mutate(cement_co2 = cement_tonnes * co2_per_tonne)
+  mutate(cement_co2eq = cement_tonnes * co2_per_tonne)
+
 
 # Add in country codes for use later on
 cement_df <- subset(merge(cement_production, ghg_df, by = "Entity", all.x = T),
                     select = c("Entity", "Code", 
-                               "cement_tonnes", "cement_co2")) %>%
+                               "cement_tonnes", "cement_co2eq")) %>%
   # filter to country level
   filter(Code != "")
 
@@ -47,13 +48,21 @@ percent_reduction_vars <- c(0:100)
 # Write printable versions of variable names
 region_print <- setNames(as.list(ghg_df$Entity), ghg_df$Code)
 
+# Filter dataframe to just Entity, Code, and emissions
+cement_df <- subset(cement_df,
+                    select = c("Entity", "Code", "cement_co2eq"))
+# Add in missing countries to match the ghg_df 
+cement_df <- subset(merge(ghg_df, cement_df, by = c("Entity", "Code"), all.x = TRUE),
+                    select = c("Entity", "Code", "cement_co2eq"))
+
+
 # Write function to calculate impact of mitigant
 reduce_cement_production <- function(region, percent_reduction){
   # Apply reduction to cement production emission data
   old_emissions <- cement_df[
-    cement_df$Code %in% region, "cement_co2"]
+    cement_df$Code %in% region, "cement_co2eq"]
   new_emissions <- cement_df[
-    cement_df$Code %in% region, "cement_co2"] *
+    cement_df$Code %in% region, "cement_co2eq"] *
     (100 - percent_reduction) / 100
   impact <- old_emissions - new_emissions
   impact_million_tonnes <- impact / 1000000000
@@ -62,16 +71,21 @@ reduce_cement_production <- function(region, percent_reduction){
   global_emissions <- ghg_df[ghg_df$Code == 'OWID_WRL', 'co2eq']
   percent_impact_country <- impact / country_emissions * 100
   percent_impact_global <- impact / global_emissions * 100
-  # Print result
-  print(paste0(
-    'The impact of reducing ', region_print[region], ' cement production by ', 
-    percent_reduction, '% is a reduction of ',
-    round(impact_million_tonnes, 2), ' million tonnes CO2 equivalent or ',
-    round(percent_impact_country, 2), '% of total ', region_print[region], 
-    ' emissions.'))
-  print(paste0(
-    'This is ', round(percent_impact_global, 2), '% of global emissions.'))
+  # Organise outputs
+  output_df <- data.frame("Code" = region,
+                          "Entity" = ghg_df[
+                            ghg_df$Code %in% region,
+                          ]$Entity,
+                          "old_emissions" = old_emissions,
+                          "new_emissions" = new_emissions,
+                          "impact" = impact,
+                          "impact_million_tonnes" = impact_million_tonnes)
+  return(output_df)
 }   
+
+
+
+
 
 
 #### SOURCES ####
@@ -82,7 +96,7 @@ reduce_cement_production <- function(region, percent_reduction){
 
 
 # TO DO:
-# Find figures for non-major countries
+# Find figures for non-major countries, potentially use: https://en.wikipedia.org/wiki/List_of_countries_by_cement_production
 
 
 
