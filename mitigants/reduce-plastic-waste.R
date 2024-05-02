@@ -5,7 +5,7 @@ library(dplyr)
 #### LOAD AND CLEAN DATA ####
 
 # Load global CO2 equivalent emissions data
-ghg_df <- read.csv('total-ghg-emissions.csv') %>%
+ghg_df <- read.csv('data/total-ghg-emissions.csv') %>%
   # Rename columns
   rename('co2eq' = Annual.greenhouse.gas.emissions.in.CO..equivalents) %>%
   # Convert from tonnes to kilograms
@@ -16,7 +16,7 @@ ghg_df <- read.csv('total-ghg-emissions.csv') %>%
   filter(Code != '')
 
 # Load population data
-pop_df <- read.csv('population.csv') %>%
+pop_df <- read.csv('data/population.csv') %>%
   # Rename columns
   rename('pop' = Population..historical.estimates.) %>%
   # Filter to most recent year
@@ -26,7 +26,7 @@ pop_df <- read.csv('population.csv') %>%
 
 
 # Load and filter total plastic waste emissions data
-total_plastic_emissions <- subset(read.csv("greenhouse-gas-emissions-from-plastics.csv"),
+total_plastic_emissions <- subset(read.csv("data/greenhouse-gas-emissions-from-plastics.csv"),
                                   select = c("Entity", "Year", "All.greenhouse.gases"))
 total_plastic_emissions <- total_plastic_emissions %>%
   # filter to most recent year
@@ -40,8 +40,7 @@ total_plastic_emissions <- total_plastic_emissions %>%
 
 
 # Load and filter country per-capita plastic waste data
-per_cap_plastic_waste <- read.csv("plastic-waste-per-capita.csv")
-per_cap_plastic_waste <- per_cap_plastic_waste %>%
+per_cap_plastic_waste <- read.csv("data/plastic-waste-per-capita.csv") %>%
   # rename columns
   rename('per_cap_plastic_waste' = Per.capita.plastic.waste..kg.person.day.) %>%
   # filter to most recent year
@@ -60,9 +59,9 @@ total_plastic_waste <- merge(
   mutate(total_plastic_waste_kg = pop * per_cap_plastic_waste)
 
 
-# Calculate the total kg of plastic waste, globally
-global_plastic_waste_kg <- sum(total_plastic_waste_kg$total_plastic_waste_kg,
-                                na.rm = TRUE)
+# Calculate the total kg of plastic waste globally
+global_plastic_waste_kg <- sum(
+  total_plastic_waste$total_plastic_waste_kg, na.rm = TRUE)
 # Calculate emissions per kg of plastic waste (kgs of co2eq per kg plastic waste)
 emissions_per_kg <- total_plastic_emissions$co2eq/global_plastic_waste_kg
 
@@ -90,7 +89,7 @@ reduce_plastic_waste <- function(region, percent_reduction){
     total_plastic_waste$Code %in% region, "total_plastic_waste_co2eq"] *
     (100 - percent_reduction) / 100
   impact <- old_emissions - new_emissions
-  impact_million_tonnes <- impact / 100000000
+  impact_million_tonnes <- impact / 1000 / 1000000
   # Compare to current emissions
   country_emissions <- ghg_df[ghg_df$Code %in% region, 'co2eq']
   global_emissions <- ghg_df[ghg_df$Code == 'OWID_WRL', 'co2eq']
