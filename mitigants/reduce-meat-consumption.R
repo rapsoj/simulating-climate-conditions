@@ -1,8 +1,5 @@
 #### PREPARE WORKSPACE ####
 
-# Move working directory to main folder
-setwd("../")
-
 # Import utils
 source("data/utils/geography.R")
 
@@ -86,22 +83,22 @@ per_capita_meat_emissions <- meat_consumption_df[,c('Entity', 'Code')] %>%
   # Add columns with per kg meat emissions
   mutate(
     # Calculate beef emissions by averaging dairy and beef herd emissions
-    per_cap_beef_co2eq = (
+    per_cap_beef_kg_co2eq = (
       food_emissions_df[
         food_emissions_df$Entity == 'Beef (beef herd)',]$co2eq
       + food_emissions_df[
         food_emissions_df$Entity == 'Beef (dairy herd)',]$co2eq) / 2
     * meat_consumption_df$beef,
     # Calculate pork emissions
-    per_cap_pork_co2eq = food_emissions_df[
+    per_cap_pork_kg_co2eq = food_emissions_df[
       food_emissions_df$Entity == 'Pig Meat',]$co2eq 
     * meat_consumption_df$pork,
     # Calculate sheep and goat emissions
-    per_cap_sheep_goat_co2eq = food_emissions_df[
+    per_cap_sheep_goat_kg_co2eq = food_emissions_df[
       food_emissions_df$Entity == 'Lamb & Mutton',]$co2eq 
     * meat_consumption_df$sheep_goat,
     # Calculate poultry emissions
-    per_cap_poultry_co2eq = food_emissions_df[
+    per_cap_poultry_kg_co2eq = food_emissions_df[
       food_emissions_df$Entity == 'Poultry Meat',]$co2eq 
     * meat_consumption_df$poultry
   )
@@ -110,31 +107,31 @@ per_capita_meat_emissions <- meat_consumption_df[,c('Entity', 'Code')] %>%
 total_meat_emissions <- merge(
   # Merge population and per capita meat emission dataframes
   pop_df, per_capita_meat_emissions[,c(
-    'Code', 'per_cap_beef_co2eq', 'per_cap_pork_co2eq',
-    'per_cap_sheep_goat_co2eq', 'per_cap_poultry_co2eq')],
+    'Code', 'per_cap_beef_kg_co2eq', 'per_cap_pork_kg_co2eq',
+    'per_cap_sheep_goat_kg_co2eq', 'per_cap_poultry_kg_co2eq')],
   by='Code', all.x=T) %>%
   # Group by region
   group_by(region) %>%
   # Impute missing per capita values using regional averages
   mutate(
     # Add imputation flags
-    impute_flag_beef = ifelse(is.na(per_cap_beef_co2eq), "*", ""),
-    impute_flag_pork = ifelse(is.na(per_cap_pork_co2eq), "*", ""),
-    impute_flag_sheep_goat = ifelse(is.na(per_cap_sheep_goat_co2eq), "*", ""),
-    impute_flag_poultry = ifelse(is.na(per_cap_poultry_co2eq), "*", ""),
+    impute_flag_per_cap_beef_kg_co2eq = ifelse(is.na(per_cap_beef_kg_co2eq), "*", ""),
+    impute_flag_per_cap_pork_kg_co2eq = ifelse(is.na(per_cap_pork_kg_co2eq), "*", ""),
+    impute_flag_per_cap_sheep_goat_kg_co2eq = ifelse(is.na(per_cap_sheep_goat_kg_co2eq), "*", ""),
+    impute_flag_per_cap_poultry_kg_co2eq = ifelse(is.na(per_cap_poultry_kg_co2eq), "*", ""),
     # Impute per capita values using regional averages
-    per_cap_beef_co2eq = if_else(
-      impute_flag_beef == "*",
-      median(per_cap_beef_co2eq, na.rm = T), per_cap_beef_co2eq),
-    per_cap_pork_co2eq = if_else(
-      impute_flag_pork == "*",
-      median(per_cap_pork_co2eq, na.rm = T), per_cap_pork_co2eq),
-    per_cap_sheep_goat_co2eq = if_else(
-      impute_flag_sheep_goat == "*",
-      median(per_cap_sheep_goat_co2eq, na.rm = T), per_cap_sheep_goat_co2eq),
-    per_cap_poultry_co2eq = if_else(
-      impute_flag_poultry == "*",
-      median(per_cap_poultry_co2eq, na.rm = T), per_cap_poultry_co2eq)
+    per_cap_beef_kg_co2eq = if_else(
+      impute_flag_per_cap_beef_kg_co2eq == "*",
+      median(per_cap_beef_kg_co2eq, na.rm = T), per_cap_beef_kg_co2eq),
+    per_cap_pork_kg_co2eq = if_else(
+      impute_flag_per_cap_pork_kg_co2eq == "*",
+      median(per_cap_pork_kg_co2eq, na.rm = T), per_cap_pork_kg_co2eq),
+    per_cap_sheep_goat_kg_co2eq = if_else(
+      impute_flag_per_cap_sheep_goat_kg_co2eq == "*",
+      median(per_cap_sheep_goat_kg_co2eq, na.rm = T), per_cap_sheep_goat_kg_co2eq),
+    per_cap_poultry_kg_co2eq = if_else(
+      impute_flag_per_cap_poultry_kg_co2eq == "*",
+      median(per_cap_poultry_kg_co2eq, na.rm = T), per_cap_poultry_kg_co2eq)
   ) %>%
   # Ungroup data
   ungroup() %>%
@@ -143,39 +140,45 @@ total_meat_emissions <- merge(
   # Impute remaining missing per capita values using continent averages
   mutate(
     # Add imputation flags
-    impute_flag_beef = ifelse(
-      is.na(per_cap_beef_co2eq),"**", impute_flag_beef),
-    impute_flag_pork = ifelse(
-      is.na(per_cap_pork_co2eq), "**", impute_flag_pork),
-    impute_flag_sheep_goat = ifelse(
-      is.na(per_cap_sheep_goat_co2eq), "**", impute_flag_sheep_goat),
-    impute_flag_poultry = ifelse(
-      is.na(per_cap_poultry_co2eq), "**", impute_flag_poultry),
+    impute_flag_per_cap_beef_kg_co2eq = ifelse(
+      is.na(per_cap_beef_kg_co2eq),"**", impute_flag_per_cap_beef_kg_co2eq),
+    impute_flag_per_cap_pork_kg_co2eq = ifelse(
+      is.na(per_cap_pork_kg_co2eq), "**", impute_flag_per_cap_pork_kg_co2eq),
+    impute_flag_per_cap_sheep_goat_kg_co2eq = ifelse(
+      is.na(per_cap_sheep_goat_kg_co2eq), "**", impute_flag_per_cap_sheep_goat_kg_co2eq),
+    impute_per_cap_poultry_kg_co2eq = ifelse(
+      is.na(per_cap_poultry_kg_co2eq), "**", impute_flag_per_cap_poultry_kg_co2eq),
     # Impute per capita values using regional averages
-    per_cap_beef_co2eq = if_else(
-      impute_flag_beef == "**",
-      median(per_cap_beef_co2eq, na.rm = T), per_cap_beef_co2eq),
-    per_cap_pork_co2eq = if_else(
-      impute_flag_pork == "**",
-      median(per_cap_pork_co2eq, na.rm = T), per_cap_pork_co2eq),
-    per_cap_sheep_goat_co2eq = if_else(
-      impute_flag_sheep_goat == "**",
-      median(per_cap_sheep_goat_co2eq, na.rm = T), per_cap_sheep_goat_co2eq),
-    per_cap_poultry_co2eq = if_else(
-      impute_flag_poultry == "**",
-      median(per_cap_poultry_co2eq, na.rm = T), per_cap_poultry_co2eq)
+    per_cap_beef_kg_co2eq = if_else(
+      impute_flag_per_cap_beef_kg_co2eq == "**",
+      median(per_cap_beef_kg_co2eq, na.rm = T), per_cap_beef_kg_co2eq),
+    per_cap_pork_kg_co2eq = if_else(
+      impute_flag_per_cap_pork_kg_co2eq == "**",
+      median(per_cap_pork_kg_co2eq, na.rm = T), per_cap_pork_kg_co2eq),
+    per_cap_sheep_goat_kg_co2eq = if_else(
+      impute_flag_per_cap_sheep_goat_kg_co2eq == "**",
+      median(per_cap_sheep_goat_kg_co2eq, na.rm = T), per_cap_sheep_goat_kg_co2eq),
+    per_cap_poultry_kg_co2eq = if_else(
+      impute_per_cap_poultry_kg_co2eq == "**",
+      median(per_cap_poultry_kg_co2eq, na.rm = T), per_cap_poultry_kg_co2eq)
   ) %>%
   # Add columns with total meat emissions
   mutate(
     # Calculate total beef emissions
-    total_beef_co2eq = pop * per_cap_beef_co2eq,
+    total_beef_kg_co2eq = pop * per_cap_beef_kg_co2eq,
     # Calculate total pork emissions
-    total_pork_co2eq = pop * per_cap_pork_co2eq,
+    total_pork_kg_co2eq = pop * per_cap_pork_kg_co2eq,
     # Calculate total sheep and goat emissions
-    total_sheep_goat_co2eq = pop * per_cap_sheep_goat_co2eq,
+    total_sheep_goat_kg_co2eq = pop * per_cap_sheep_goat_kg_co2eq,
     # Calculate total poultry emissions
-    total_poultry_co2eq = pop * per_cap_poultry_co2eq
-  )
+    total_poultry_kg_co2eq = pop * per_cap_poultry_kg_co2eq
+  ) %>%
+  # Remove unnecessary columns
+  select(-Year) %>%
+  # Standardise column positions
+  relocate(all_of(c('Code', 'Entity', 'region', 'continent', 'pop')), .before = 1) %>%
+  # Place imputation flags last
+  relocate(matches("^impute"), .after = last_col())
 
 # Write function to calculate impact of mitigant
 reduce_meat_consumption <- function(meat, country, percent_reduction){
@@ -191,15 +194,19 @@ reduce_meat_consumption <- function(meat, country, percent_reduction){
   percent_impact_country <- impact / country_emissions * 100
   percent_impact_global <- impact / global_emissions * 100
   # Print result
-  print(paste0(
+  result <- c(
+    paste0(
     'The impact of reducing ', country_print[country], ' ', meat_print[meat],
     ' consumption by ', percent_reduction, '% is a reduction of ',
     round(impact_million_tonnes, 2), ' million tonnes CO2 equivalent or ',
     round(percent_impact_country, 2), '% of total ', country_print[country], 
-    ' emissions.'))
-  print(paste0(
-    'This is ', round(percent_impact_global, 2), '% of global emissions.'))
-}
+    ' emissions.'),
+  paste0(
+    'This is ', round(percent_impact_global, 2), '% of global emissions.')
+  )}
+
+# Output dataframe with total and per capita values by country
+write.csv(total_meat_emissions, 'mitigants/output/reduce_meat_consumption.csv', row.names=FALSE)
 
 
 #### SOURCES ####
@@ -210,6 +217,5 @@ reduce_meat_consumption <- function(meat, country, percent_reduction){
 # ghg-per-kg-poore.csv: Our World in Data. (2018). "Greenhouse gas emissions per kilogram of food product". Retrieved from https://ourworldindata.org/environmental-impacts-of-food.
 
 ### TODO: Add fish consumption data
-### TODO: Impute missing values for countries based on regional per capita averages
 ### TODO: Add economy of scale adjustment for per capita meat emissions
 ### TODO: Do replacements instead of removals

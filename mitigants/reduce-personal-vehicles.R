@@ -1,7 +1,7 @@
 #### PREPARE WORKSPACE ####
 
 # Move working directory to main folder
-setwd("C:/Users/fakuz/OneDrive/Dokumente/GitHub/simulating-climate-conditions")
+setwd("../")
 
 # Import utils
 source("data/utils/geography.R")
@@ -51,21 +51,21 @@ pop_df <- read.csv('data/population.csv') %>%
   dplyr::rename('continent' = ind)
 
 # Load data on vehicle emissions
-vehicle_emissions_df <- read.csv('data/per-capita-co2-transport.csv')
-
-# Print the column names to verify the structure
-print(names(vehicle_emissions_df))
-vehicle_emissions_df <- vehicle_emissions_df %>%
-  dplyr::rename(per_capita_emissions = Per.capita.carbon.dioxide.emissions.from.transport)
+vehicle_emissions_df <- read.csv('data/per-capita-co2-transport.csv') %>%
+  dplyr::rename(per_capita_emissions = `Per.capita.CO2.emissions`) %>%
+  # Group by country
+  group_by(Entity) %>%
+  # Select the most recent year for which data is available
+  slice_max(order_by = Year) %>%
+  # Ungroup data
+  ungroup()
 
 # Load data on registered vehicles per 1000 people
 vehicles_per_1000_df <- read.csv('data/registered-vehicles-per-1000-people.csv', 
                                  fileEncoding = "UTF-8-BOM", 
                                  check.names = FALSE, 
-                                 stringsAsFactors = FALSE)
-# Check the structure and first few entries of the dataframe
-str(vehicles_per_1000_df)
-head(vehicles_per_1000_df)
+                                 stringsAsFactors = FALSE) %>%
+  dplyr::rename(vehicles_per_1000 = `Registered.vehicles.per.1000.people`)
 
 
 #### CALCULATE IMPACT OF MITIGANT #####
@@ -77,58 +77,29 @@ percent_reduction_vars <- c(0:100)
 # Write printable versions of variable names
 country_print <- setNames(as.list(ghg_df$Entity), ghg_df$Code)
 
-# Calculate total vehicles with population data
-total_vehicles_df <- merge(vehicle_emissions_df, pop_df, by = "Code") %>%
-  mutate(total_vehicles = per_capita_emissions * pop)
-
-
 # Calculate total emissions from vehicles
-total_vehicle_emissions <- merge(
-  # Merge population and per capita vehicle emission dataframes
-  total_vehicle_emissions <- merge(
-    x = pop_df,
-    y = vehicle_emissions_df,
-    by = "Code",
-    all.x = TRUE
-  ) %>%
-    mutate(
-      total_vehicle_emissions = pop * per_capita_emissions
-    )
-    
-  # Group by region
-  group_by(region) %>%
-  # Impute missing per capita values using regional averages
-  mutate(
-    impute_flag_veh = ifelse(is.na(Car.and.vans.emissions), "*", ""),
-    Car.and.vans.emissions = if_else(
-      impute_flag_veh == "*", median(Car.and.vans.emissions, na.rm = TRUE), Car.and.vans.emissions)
-  ) %>%
-  ungroup() %>%
-  # Group by continent
-  group_by(continent) %>%
-  # Impute remaining missing per capita values using continent averages
-  mutate(
-    impute_flag_veh = ifelse(is.na(Car.and.vans.emissions), "**", impute_flag_veh),
-    Car.and.vans.emissions = if_else(
-      impute_flag_veh == "**", median(Car.and.vans.emissions, na.rm = TRUE), Car.and.vans.emissions)
-  ) %>%
-  # Calculate total vehicle emissions
-  mutate(
-    total_vehicle_co2eq = pop * Car.and.vans.emissions
-  )
+total_vehicles_emissions_df <- pop_df %>% select(-c(Year, Entity)) %>%
+  merge(vehicles_per_1000_df, by = "Code", all.x=T) %>%
+  # Calculate per capita vehicle emissions
+  mutate(total_vehicles = (vehicles_per_1000 / 1000) * pop) %>%
+  # Merge with vehicle emissions data
+  merge(vehicle_emissions_df %>% select(!Entity), by = "Code", all.x = TRUE) %>%
+  # Calculate total emissions from vehicles
+  mutate(total_vehicle_emissions = total_vehicles * per_capita_emissions)
 
 # Write function to calculate impact of vehicle reduction
 reduce_vehicles <- function(country, percent_reduction){
+  
   # Apply reduction to total vehicle emission data
-  old_emissions <- total_vehicle_emissions[
-    total_vehicle_emissions$Code %in% country, 'total_vehicle_co2eq']
+  old_emissions <- total_vehicles_emissions_df[
+    total_vehicles_emissions_df$Code %in% country, 'total_vehicle_emissions']
   new_emissions <- old_emissions * (100 - percent_reduction) / 100
   impact <- old_emissions - new_emissions
-  impact_million_tonnes <- impact / 100000000
+  impact_million_tonnes <- impact / 1000 / 1000000
   
   # Compare to current emissions
-  country_emissions <- ghg_df[ghg_df$Code %in% country, 'co2eq']
-  global_emissions <- ghg_df[ghg_df$Code == 'OWID_WRL', 'co2eq']
+  country_emissions <- sum(ghg_df[ghg_df$Code %in% country, 'co2eq'])
+  global_emissions <- sum(ghg_df[ghg_df$Code == 'OWID_WRL', 'co2eq'])
   percent_impact_country <- impact / country_emissions * 100
   percent_impact_global <- impact / global_emissions * 100
   
@@ -142,14 +113,7 @@ reduce_vehicles <- function(country, percent_reduction){
 }
 
 #### SOURCES ####
-
-# https://www.iea.org/data-and-statistics/charts/transport-sector-co2-emissions-by-mode-in-the-sustainable-development-scenario-2000-2030
-# https://www.statista.com/statistics/1201189/road-transport-sector-co2-emissions-worldwide-by-country/
-# https://ourworldindata.org/co2-emissions-from-transport
-# https://ourworldindata.org/grapher/per-capita-co2-transport?time=latest
-
-
 # total-ghg-emissions.csv: Our World in Data. (2023). "Per capita CO₂ emissions". Retrieved from https://ourworldindata.org/co2-and-greenhouse-gas-emissions.
 # population-and-demography.csv: Our World in Data. (2022). "Population". Retrieved from https://ourworldindata.org/population. 
-# per-capita-co2-domestic-aviation.csv: Our World in Data. (2019). "Transport". Retrieved from https://ourworldindata.org/transport#:~:text=Global%20aviation%20%E2%80%93%20both%20passenger%20flights,CO2%20emissions%20in%202018.
-# per-capita-co2-international-flights-adjusted.csv: Our World in Data. (2019). "Transport". Retrieved from https://ourworldindata.org/transport#:~:text=Global%20aviation%20%E2%80%93%20both%20passenger%20flights,CO2%20emissions%20in%202018.
+# per-capita-co2-transport.csv: Our World in Data. (2023). "Per capita CO₂ emissions from transport, 2020"Retrieved from  https://ourworldindata.org/co2-emissions-from-transport
+# registered-vehicles-per-1000-people.csv: OUr World in Data. (2022). "Registered vehicles per 1,000 people, 2017". Retrieved from https://ourworldindata.org/grapher/registered-vehicles-per-1000-people

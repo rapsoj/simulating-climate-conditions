@@ -1,3 +1,5 @@
+#### FIRST PLASTIC WASTE ANALYSIS ##############################################
+
 # Load libraries
 library(dplyr)
 
@@ -40,7 +42,8 @@ total_plastic_emissions <- total_plastic_emissions %>%
 
 
 # Load and filter country per-capita plastic waste data
-per_cap_plastic_waste <- read.csv("data/plastic-waste-per-capita.csv") %>%
+per_cap_plastic_waste <- read.csv("data/plastic-waste-per-capita.csv")
+per_cap_plastic_waste <- per_cap_plastic_waste %>%
   # rename columns
   rename('per_cap_plastic_waste' = Per.capita.plastic.waste..kg.person.day.) %>%
   # filter to most recent year
@@ -59,16 +62,15 @@ total_plastic_waste <- merge(
   mutate(total_plastic_waste_kg = pop * per_cap_plastic_waste)
 
 
-# Calculate the total kg of plastic waste globally
-global_plastic_waste_kg <- sum(
-  total_plastic_waste$total_plastic_waste_kg, na.rm = TRUE)
+# Calculate the total kg of plastic waste, globally
+global_plastic_waste_kg <- sum(total_plastic_waste$total_plastic_waste_kg,
+                               na.rm = TRUE)
 # Calculate emissions per kg of plastic waste (kgs of co2eq per kg plastic waste)
 emissions_per_kg <- total_plastic_emissions$co2eq/global_plastic_waste_kg
 
 # Add emissions to the population and per cap waste dataframe
-total_plastic_waste$total_plastic_waste_co2eq <- 
+total_plastic_waste$plastic_co2eq <- 
   total_plastic_waste$total_plastic_waste_kg * emissions_per_kg
-
 
 
 #### CALCULATE IMPACT OF MITIGANT #####
@@ -80,31 +82,43 @@ percent_reduction_vars <- c(0:100)
 # Write printable versions of variable names
 region_print <- setNames(as.list(ghg_df$Entity), ghg_df$Code)
 
+
+# Filter dataframe to just Entity, Code, and emissions
+total_plastic_waste <- subset(total_plastic_waste,
+                    select = c("Entity", "Code", "plastic_co2eq"))
+# Add in missing countries to match the ghg_df 
+total_plastic_waste <- subset(merge(ghg_df, total_plastic_waste,
+                                    by = c("Entity", "Code"), all.x = TRUE),
+                    select = c("Entity", "Code", "plastic_co2eq"))
+
+
+
 # Write function to calculate impact of mitigant
 reduce_plastic_waste <- function(region, percent_reduction){
   # Apply reduction to total plastic waste emission data
   old_emissions <- total_plastic_waste[
-    total_plastic_waste$Code %in% region, "total_plastic_waste_co2eq"]
+    total_plastic_waste$Code %in% region, "plastic_co2eq"]
   new_emissions <- total_plastic_waste[
-    total_plastic_waste$Code %in% region, "total_plastic_waste_co2eq"] *
+    total_plastic_waste$Code %in% region, "plastic_co2eq"] *
     (100 - percent_reduction) / 100
   impact <- old_emissions - new_emissions
-  impact_million_tonnes <- impact / 1000 / 1000000
+  impact_million_tonnes <- impact / 1000000000
   # Compare to current emissions
   country_emissions <- ghg_df[ghg_df$Code %in% region, 'co2eq']
   global_emissions <- ghg_df[ghg_df$Code == 'OWID_WRL', 'co2eq']
   percent_impact_country <- impact / country_emissions * 100
   percent_impact_global <- impact / global_emissions * 100
-  # Print result
-  print(paste0(
-    'The impact of reducing ', region_print[region], 'plastic waste by ', 
-    percent_reduction, '% is a reduction of ',
-    round(impact_million_tonnes, 2), ' million tonnes CO2 equivalent or ',
-    round(percent_impact_country, 2), '% of total ', region_print[region], 
-    ' emissions.'))
-  print(paste0(
-    'This is ', round(percent_impact_global, 2), '% of global emissions.'))
-}                              
+  
+  output_df <- data.frame("Code" = region,
+                          "Entity" = ghg_df[
+                            ghg_df$Code %in% region,
+                          ]$Entity,
+                          "old_emissions" = old_emissions,
+                          "new_emissions" = new_emissions,
+                          "impact" = impact,
+                          "impact_million_tonnes" = impact_million_tonnes)
+  return(output_df)
+}    
 
 
 #### SOURCES ####
@@ -118,3 +132,8 @@ reduce_plastic_waste <- function(region, percent_reduction){
 # To do:
 # Find more up-to-date data on plastic waste per capita 
 # See if you can separate end of life emissions into incineration, recycling, landfill, etc.
+
+
+
+
+
