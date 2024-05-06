@@ -1,0 +1,41 @@
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+from io import StringIO
+
+# URL of the Worldometer coal consumption data page
+url = 'https://www.worldometers.info/coal/coal-consumption-by-country/'
+
+# Send a GET request to the URL
+response = requests.get(url)
+
+if response.status_code == 200:
+    # Parse the HTML content of the page with BeautifulSoup
+    soup = BeautifulSoup(response.text, 'html.parser')
+    table = soup.find('table')
+    
+    if table:
+        # Convert the HTML table to a pandas DataFrame
+        html_content = str(table)
+        df = pd.read_html(StringIO(html_content))[0]
+
+        # Rename the DataFrame columns appropriately
+        df.columns = ['Rank', 'Country', 'Coal Consumption (MMcf)', 'World Share', 'Consumption Per Capita (cubic feet)']
+
+        # Convert MMcf to tonnes (assuming 57 lbs/ft³ and 0.00045359237 tonnes/lb)
+        df['Coal Consumption (tonnes)'] = df['Coal Consumption (MMcf)'] * 1e6 * 57 * 0.00045359237
+
+        # Convert Consumption Per Capita from cubic feet to tonnes
+        df['Consumption Per Capita (tonnes)'] = df['Consumption Per Capita (cubic feet)'] * 57 * 0.00045359237
+
+        # Sort the DataFrame by 'Country' column in alphabetical order
+        df = df.sort_values('Country')
+
+        # Save the DataFrame to a CSV file
+        path = '/Users/apple/Desktop/coal_consumption_by_country.csv'
+        df.to_csv(path, index=False)
+        print(f"CSV file has been saved to {path}, sorted alphabetically by country, with consumption in tonnes.")
+    else:
+        print("Table not found in the HTML.")
+else:
+    print("Failed to retrieve the page. Status Code:", response.status_code)
