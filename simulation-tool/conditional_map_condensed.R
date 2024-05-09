@@ -10,25 +10,25 @@ mitigation_df <- data.frame(Code = ghg_df$Code,
                             cement_impact = reduce_cement_production(ghg_df$Code, 100)$impact,
                             landfill_impact = reduce_landfill_waste(ghg_df$Code, 100)$impact,
                             water_impact = reduce_domestic_water_use(ghg_df$Code, 100)$impact,
-                            food_waste_impact = reduce_food_waste(ghg_df$Code, 100)$impact
+                            foodwaste_impact = reduce_food_waste(ghg_df$Code, 100)$impact
 )
 
 # For now, make all NAs equal to zero 
 mitigation_df[is.na(mitigation_df)] <- 0
 
 # Define variables
-variables <- c("Plastic", "Cement", "Landfill", "Water", "Food Waste")
+variables <- c("Plastic", "Cement", "Landfill", "Water", "FoodWaste")
 
 # Initialise the reduction_df 
 # Make sure the columns have the same name and same order as the mitigation_df
-# Also important to ensure all the numeric columns end in "_impact"
+# Also important to ensure all the numeric columns name are of the form "mitigationnamewithnospaces_impact"
 reduction_df <- data.frame(Code = ghg_df$Code,
                            Entity = ghg_df$Entity,
                            plastic_impact = rep(0, nrow(ghg_df)),
                            cement_impact = rep(0, nrow(ghg_df)),
                            landfill_impact = rep(0, nrow(ghg_df)),
                            water_impact = rep(0, nrow(ghg_df)),
-                           food_waste_impact = rep(0, nrow(ghg_df)))
+                           foodwaste_impact = rep(0, nrow(ghg_df)))
 
 
 ### APP BUILDING
@@ -38,7 +38,7 @@ ui <- fluidPage(
   sidebarLayout(
     sidebarPanel(
       selectInput("variables", "Select Variables to Reduce:",
-                  choices = c("Plastic", "Cement", "Landfill", "Water", "Food Waste"),
+                  choices = c("Plastic", "Cement", "Landfill", "Water", "FoodWaste"),
                   multiple = TRUE),
       uiOutput("sliders")
     ),
@@ -67,8 +67,8 @@ server <- function(input, output, session) {
         } else if(variable == "Water") {
           sliderInput("Water", "Percentage Reduction in Domestic Water Use",
                       min = 0, max = 100, value = 0)
-        } else if(variable == "Food Waste") {
-          sliderInput("Food Waste", "Percentage Reduction in Food Waste",
+        } else if(variable == "FoodWaste") {
+          sliderInput("FoodWaste", "Percentage Reduction in Food Waste",
                       min = 0, max = 100, value = 0)
         }
       })
@@ -77,6 +77,7 @@ server <- function(input, output, session) {
   })
   
   output$map <- renderPlotly({
+    
     # Calculate impact of reduction for the selected variables
     for (var in variables) {
       # for any selected variable ...
@@ -109,3 +110,4 @@ server <- function(input, output, session) {
 
 # Run the application
 shinyApp(ui = ui, server = server)
+
