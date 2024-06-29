@@ -2,6 +2,7 @@
 
 # Import utils
 source("data/utils/geography.R")
+source("data/utils/impute_by_geography.R")
 
 # Load libraries
 library(dplyr)
@@ -184,7 +185,7 @@ total_meat_emissions <- merge(
 reduce_meat_consumption <- function(meat, country, percent_reduction){
   # Apply reduction to total meat emission data
   old_emissions <- total_meat_emissions[
-    total_meat_emissions$Code %in% country, paste0('total_', meat, '_co2eq')]
+    total_meat_emissions$Code %in% country, paste0('total_', meat, '_kg_co2eq')]
   new_emissions <- old_emissions * (100 - percent_reduction) / 100
   impact <- old_emissions - new_emissions
   impact_million_tonnes <- impact / 1000 / 1000000
@@ -203,7 +204,8 @@ reduce_meat_consumption <- function(meat, country, percent_reduction){
     ' emissions.'),
   paste0(
     'This is ', round(percent_impact_global, 2), '% of global emissions.')
-  )}
+  )
+  return(result)}
 
 # Output dataframe with total and per capita values by country
 write.csv(total_meat_emissions, 'mitigants/output/reduce_meat_consumption.csv', row.names=FALSE)
